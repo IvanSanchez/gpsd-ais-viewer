@@ -71,6 +71,8 @@ class aiswalker(urwid.SimpleFocusListWalker):
     def __init__(self):
         self.d = OrderedDict()
         self.mmsis = []
+        self.loop = None    # Reference to the URWID's main loop, to refresh the screen on any change.
+        self.listbox = None
         #self._focus = 0
 
         self.emptyrecord = {}
@@ -92,7 +94,8 @@ class aiswalker(urwid.SimpleFocusListWalker):
         if not mmsi in self.d:
             self.d[mmsi] = dict(self.emptyrecord)   # Instantiate a new one, not refer to the existing one
             self.d = OrderedDict( sorted(self.d.items()) )    # Re-do the dict to keep mmsis sorted
-            i = self.d.keys().index(mmsi)
+            self.mmsis = self.d.keys()
+            i = self.mmsis.index(mmsi)
             self.mmsis = sorted(self.d.keys())
 
             self.insert ( i, None )
@@ -105,8 +108,33 @@ class aiswalker(urwid.SimpleFocusListWalker):
 
         columns = urwid.Columns( columns, dividechars = 1 )
 
-        i = self.d.keys().index(mmsi)
+        i = self.mmsis.index(mmsi)
         self[ i ] = columns
+
+
+        if (self.listbox):
+            # Get the visible rows given the current size of the screen
+            visible_rows = self.listbox.calculate_visible( self.loop.screen.get_cols_rows() ,False)
+            is_in = False
+
+            # Has the focused row been updated?
+            if visible_rows[0][1] == columns:
+                is_in = True
+
+            # Iterate through the rows over and under the focused one, check if
+            #   any of them has been updated
+            for i in visible_rows[1][1]:
+                if i[0] == columns:
+                    is_in = True
+            for i in visible_rows[2][1]:
+                if i[0] == columns:
+                    is_in = True
+
+            # If the updated row is visible, redraw the screen.
+            if is_in:
+                if (self.loop):
+                    self.loop.draw_screen()
+
 
     def get_header_cols(self):
         columns = []
@@ -150,12 +178,6 @@ class aisviewer:
     def __init__(self,stream,interval):
         self.stream = stream
         self.walker = aiswalker()
-        self.interval = interval
-
-
-    def refresh(self,_loop,_data):
-        _loop.draw_screen()
-        _loop.set_alarm_in(self.interval,self.refresh)
 
     def main(self):
         self.listbox = urwid.ListBox(self.walker)
@@ -169,7 +191,10 @@ class aisviewer:
 
         self.loop = urwid.MainLoop(self.view, self.palette)
 
-        self.loop.set_alarm_in(self.interval,self.refresh)
+        # Back references so that walker.update() can refresh the screen when needed
+        self.walker.loop = self.loop
+        self.walker.listbox = self.listbox
+
         self.loop.run()
 
 
@@ -182,8 +207,6 @@ if __name__ == "__main__":
                     help='Port gpsd is listening to. Defaults to 2947')
     parser.add_argument('--scaled', default=False, type=bool,
                         help='If set, data will be scaled to readable values. If not set (default), the raw numeric values will be shown.')
-    parser.add_argument('--interval', default=2, type=int,
-                        help='Update interval, in seconds. Defaults to 2.')
     args = parser.parse_args()
 
     # Load up gpsd connection
@@ -195,7 +218,7 @@ if __name__ == "__main__":
 
     g.stream(gpsd_flags)
 
-    v = aisviewer(g, args.interval)
+    v = aisviewer(g)
     v.main()
 
 
