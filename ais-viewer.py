@@ -175,7 +175,7 @@ class aisviewer:
         ('key', "Ctrl+C"), " quit",
         ])
 
-    def __init__(self,stream,interval):
+    def __init__(self,stream):
         self.stream = stream
         self.walker = aiswalker()
 
