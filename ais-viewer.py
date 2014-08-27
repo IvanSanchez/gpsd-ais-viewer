@@ -30,7 +30,7 @@ class aiswalker(urwid.SimpleFocusListWalker):
          'course',
          'heading',
          'speed',
-         #'turn',
+         'turn',
          #'epfd',
          #'accuracy',
          #'destination',
@@ -55,8 +55,8 @@ class aiswalker(urwid.SimpleFocusListWalker):
          ##'regional',
          #'raim',
          ##'band',
-         #'aid_type',
-         #'virtual_aid',
+         'aid_type',
+         'virtual_aid',
          #'to_port',
          #'to_bow',
          #'to_stern',
@@ -156,10 +156,15 @@ class aislistener(threading.Thread):
     def run(self):
         count = 0
 
-        for message in self.stream:
-            if 'mmsi' in message:   # Skip control messages
-                self.walker.update(message)
-                count = count + 1
+        # Somehow this gets invalid JSON once in a while, so ignore JSON errors
+        while True:
+            try:
+                for message in self.stream:
+                    if 'mmsi' in message:   # Skip control messages
+                        self.walker.update(message)
+                        count = count + 1
+            except Exception, e:
+                pass
 
 class aisviewer:
 
